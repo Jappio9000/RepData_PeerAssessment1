@@ -5,13 +5,15 @@ output:
     keep_md: true
 ---
 
-First of all, we're going to load the R-package `ggplot2` for creating nice-looking plots: 
+First of all, we're going to load the R-package `ggplot2` for creating nice-looking plots and `plyr` for manipulating the data: 
 ```{r echo=TRUE}
 require(ggplot2)
+require(plyr)
 ```
 
 
 ## Loading and preprocessing the data
+### 1. Loading the data
 The data is available in the 'activity.zip' file. We're going to read it in directly from the zipped archive:
 ```{r echo=TRUE}
         data <- read.csv(unz("activity.zip","activity.csv"))
@@ -22,6 +24,7 @@ Let's see the data formats, using `str`:
         str(data)
 ```
 
+### 2. Preprocessing the data (optional)
 Since the date column is stored as a factor, let's create column 'date2' in the `POSIXlt` format for later use:
 ```{r echo=TRUE}
         data$date2 <- strptime(data$date, "%Y-%m-%d")
@@ -30,17 +33,23 @@ Since the date column is stored as a factor, let's create column 'date2' in the 
 
 ## What is mean total number of steps taken per day?
 
+### 1. Total total number of steps per day
 First, we'll calculate the total number of steps taken per day and print the result in a scatterplot:
 ```{r echo=TRUE}
         dailysum <- tapply(data$steps, data$date, FUN=sum)
         plot(dailysum, main ="Total steps per day", xlab="Days", ylab="Steps")
+        max <- max(dailysum, na.rm=TRUE)
 ```
 
+For example, the above plot shows that the maximum total number of steps per day is `r max` steps.
+
+### 2. Histogram of the total number of steps per day
 Then we're going to make a simple histogram plot:
 ```{r echo=TRUE} 
          ggplot() + aes(dailysum)+ geom_histogram(binwidth=500, colour="black", fill="steelblue", na.rm=TRUE) + ggtitle("Histogram of Total Daily Steps") + xlab("Total daily steps") + ylab("Count (days)")
 ```
 
+### 3. Mean and median total number of steps per day
 The  mean and median of the total number of steps taken per day are:
 ```{r echo=TRUE}
         mean <- as.integer(mean(dailysum, na.rm=TRUE))
@@ -52,10 +61,43 @@ The  mean and median of the total number of steps taken per day are:
 _Note the `as.integer`, which I used to prevent double precision that would provide no valuable information._
 
 ## What is the average daily activity pattern?
+### 1. Time-series plot of average daily pattern
+Create the daily activity pattern by calculating the average number of steps per 5-minute interval:
+```{r echo=TRUE}
+        profile <- tapply(data$steps, data$interval, FUN=mean, na.rm=TRUE)
+```
 
+Plot the data on a simple line graph:
+```{r echo=TRUE}
+        plot(profile, type = "l", xlab="Time interval (minutes)", ylab="Steps", main="Average daily profile")
+```
+
+### 2. The 5-minute time-interval with the maximum number of steps
+The interval in which the most steps are taken (on average over the dataset) is calculated as follows:
+```{r echo=TRUE}
+        max <- max(profile)
+        maxinterval <- match(max(profile), profile)
+```
+
+From the daily profile, the maximum number of steps in any interval is `r max` and occurs on time interval `r maxinterval`.
 
 
 ## Imputing missing values
+
+### 1. Total number of rows containing missing values
+```{r echo=TRUE}
+        missing <- sum(!complete.cases(data))
+```
+
+The dataset contains `r missing` observations (rows) with missing values (NA).
+
+### 2. Strategy to fill in the missing values
+We'll assume that the missing values are caused by a data communication or other technical failure. Then, we can make the simplified assumption that the persons with missing data behaved like the 'average' person from the rest of the dataset. Now, we can calculate the mean for every 5-minute interval, excluding the NA's and subset the NA's with that outcome.
+```{r echo=TRUE}
+
+
+```
+
 
 
 
