@@ -48,7 +48,33 @@ Since the date column is stored as a factor, let's create column 'date2' in the 
 
 ## What is mean total number of steps taken per day?
 
+First, we'll calculate the total number of steps taken per day and print the result in a scatterplot:
 
+```r
+        dailysum <- tapply(data$steps, data$date, FUN=sum)
+        plot(dailysum, main ="Total steps per day", xlab="Days", ylab="Steps")
+```
+
+![](PA1_template_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+
+Then we're going to make a simple histogram plot:
+
+```r
+         ggplot() + aes(dailysum)+ geom_histogram(binwidth=500, colour="black", fill="steelblue", na.rm=TRUE) + ggtitle("Histogram of Total Daily Steps") + xlab("Total daily steps") + ylab("Count (days)")
+```
+
+![](PA1_template_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+
+The  mean and median of the total number of steps taken per day are:
+
+```r
+        mean <- as.integer(mean(dailysum, na.rm=TRUE))
+        median <- as.integer(median(dailysum, na.rm=TRUE))
+```
+- Median: 10765
+- Mean: 10766
+
+_Note the `as.integer`, which I used to prevent double precision that will provide no valuable information._
 
 ## What is the average daily activity pattern?
 
