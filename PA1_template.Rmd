@@ -1,14 +1,14 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
 output: 
-  html_document:
+  html_document: 
     keep_md: true
 ---
 
-First of all, we're going to load the R-package `ggplot2` for creating nice-looking plots and `plyr` for manipulating the data: 
+First of all, we're going to load the R-package `ggplot2` for creating nice-looking plots and `dplyr` for manipulating the data: 
 ```{r echo=TRUE}
 require(ggplot2)
-require(plyr)
+require(dplyr)
 ```
 
 
@@ -25,9 +25,10 @@ Let's see the data formats, using `str`:
 ```
 
 ### 2. Preprocessing the data (optional)
-Since the date column is stored as a factor, let's create column 'date2' in the `POSIXlt` format for later use:
+Since the date column is stored as a factor, let's create column 'date2' in the `POSIXct` format for later use. And we'll create a new column 'time' that contains the interval time in a 4-digit format.
 ```{r echo=TRUE}
-        data$date2 <- strptime(data$date, "%Y-%m-%d")
+        data$date2 <- as.POSIXct(data$date)
+        data$time <- formatC(data$interval, width=4, format="d", flag="0")
         str(data)
 ```
 
@@ -64,18 +65,18 @@ _Note the `as.integer`, which I used to prevent double precision that would prov
 ### 1. Time-series plot of average daily pattern
 Create the daily activity pattern by calculating the average number of steps per 5-minute interval:
 ```{r echo=TRUE}
-        profile <- tapply(data$steps, data$interval, FUN=mean, na.rm=TRUE)
+        profile <- tapply(data$steps, data$time, FUN=mean, na.rm=TRUE)
 ```
 
 Plot the data on a simple line graph:
 ```{r echo=TRUE}
-        plot(profile, type = "l", xlab="Time interval (minutes)", ylab="Steps", main="Average daily profile")
+        plot(profile, type = "l", xlab="Time interval (one day)", ylab="Steps", main="Average daily profile")
 ```
 
 ### 2. The 5-minute time-interval with the maximum number of steps
 The interval in which the most steps are taken (on average over the dataset) is calculated as follows:
 ```{r echo=TRUE}
-        max <- max(profile)
+        max <- as.integer(max(profile))
         maxinterval <- match(max(profile), profile)
 ```
 
@@ -86,19 +87,105 @@ From the daily profile, the maximum number of steps in any interval is `r max` a
 
 ### 1. Total number of rows containing missing values
 ```{r echo=TRUE}
-        missing <- sum(!complete.cases(data))
+        missing <- sum(!complete.cases(data[,c(1:3)]))
 ```
 
 The dataset contains `r missing` observations (rows) with missing values (NA).
 
 ### 2. Strategy to fill in the missing values
-We'll assume that the missing values are caused by a data communication or other technical failure. Then, we can make the simplified assumption that the persons with missing data behaved like the 'average' person from the rest of the dataset. Now, we can calculate the mean for every 5-minute interval, excluding the NA's and subset the NA's with that outcome.
+We'll assume that the missing values are caused by a data communication or other technical failure. Then, we can make the simplified assumption that the persons with missing data behaved like the 'average' person from the rest of the dataset. Now, we can calculate the mean for every 5-minute interval, excluding the NA's and subset the NA's with that outcome. See the next step for execution of this strategy.
+
+
+### 3. Create new dataset with missing data filled in
+
+We'll create a second data.frame named 'data_imp' where we're going to fill in the profile values where missing values are found. To be able to map the profile data to the missing values in the new data.frame, we'll create a second dataframe that contains the same 'time' values as created in the preprocessing step (column `data$time`).
+
 ```{r echo=TRUE}
+        data_imp <- data
+        times <- data$time[1:288]
+        ## create a data.frame for the profile
+        profile <- data.frame(profile, times)
+        names(profile) <- c("mean", "time")
+
+        ## impute missing values with a for-loop
+        i <- 1
+        for (i in 1:17568) {
+                
+                if (is.na(data_imp$steps[i])) {
+                        time <- data_imp$time[i]
+                        data_imp$imputed[i] <- profile$mean[profile$time=="0000"]
+                        } else {
+                        data_imp$imputed[i] <- data_imp$steps[i]
+                        }
+                }
+        i=i+1
+         
+        ## check if there really are no more NA's in the new 'imputed'column
+        nas <- sum(is.na(data_imp$imputed))
+        
+```
+Number of missing values after imputing the NA's: `r nas`. _this (should be 0!)_
 
 
+### 4. Make a histogram and report mean and median steps per day
+
+Create a histogram plot of the new data, exactly the way we made in the first part of the assignment but using the new dataframe with NA-imputed data:
+```{r echo=TRUE}
+        str(data_imp)        
+
+        dailysum_imp <- tapply(data_imp$imputed, data_imp$date, FUN=sum)
+        
+        ggplot() + aes(dailysum_imp)+ geom_histogram(binwidth=500, fill="mediumspringgreen", color="grey42") + ggtitle("Histogram of Total Daily Steps with NAs imputed") + xlab("Total daily steps") + ylab("Count (days)")
 ```
 
+The mean and median steps per day are calculated here:
+```{r echo=TRUE}
+        mean <- as.integer(mean(dailysum_imp))
+        median <- as.integer(median(dailysum_imp))
+```
+- Median: `r median`
+- Mean: `r mean`
 
+
+Difference with original data: since we used the 'mean' function to create the profile data to fill up the missing values, the mean is somewhat 'stronger' in our new dataset. But overall, when we look at the histograms the difference is quite small. Thus the impact of this type of imputing is small.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+### 1. Create factor variable weekday/weekend
+
+Use the 'weekdays' function to create a column that contains the (abbreviated) name of the weekday. Then, create a vector that contains "weekend" or "weekday".
+
+```{r echo=TRUE}
+        data_imp$weekday <- as.factor(weekdays(data_imp$date2, abbreviate = TRUE))
+        
+        daytype <- function(weekday) {
+                if (weekday %in% c("za", "zo")) {
+                "weekend"
+                } else {
+                "weekday"
+                }
+        }
+        
+        data_imp$daytype <- as.factor(sapply(data_imp$weekday, daytype))
+```
+
+### 2. Make a panel plot for weekdays and weekend days
+
+This is a very basic panel plot. I've used the base plotting system here to save some time.
+```{r echo=TRUE}
+        
+        weekday_subset <- filter(data_imp, daytype == "weekday")
+        weekend_subset <- filter(data_imp, daytype == "weekend")
+
+        profile_weekday <- tapply(weekday_subset$imputed, weekday_subset$time, FUN=sum)
+        profile_weekend <- tapply(weekend_subset$imputed, weekend_subset$time, FUN=sum)
+        
+        par(mfrow=c(2,1))
+        
+        plot(profile_weekday, type = "l", xlab="Time interval (one day)", ylab="Steps", main="Average daily profile for weekdays", ylim=c(0,10000))
+         plot(profile_weekend, type = "l", xlab="Time interval (one day)", ylab="Steps", main="Average daily profile for weekend days", ylim=c(0,10000))
+```
+
+
+#END
